@@ -170,8 +170,10 @@ base binput() {
 		cout << "// Inputing keyboard \\\\" << endl;
 		break;
 	case 'o':
+		cout << "// Inputing mouse \\\\" << endl;
 		break;
 	case 'a':
+		cout << "// Inputing scaner \\\\" << endl;
 		break;
 	}
 	do
