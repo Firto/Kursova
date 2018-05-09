@@ -3,6 +3,9 @@
 #include <windows.h>
 #include <stdio.h>
 #include <conio.h>
+#include <fstream>
+#include <iomanip>
+
 using namespace std;
 
 void cl() {
@@ -142,14 +145,32 @@ bool yesno(const char * text) {
 		return false;
 	}
 }
-
+int onlynums(char *text) {
+	char temp[31];
+	int h = 0, m = 0;
+	while (text[m] != '\0')
+	{
+		if (text[m] >= '0' && text[m] <= '9') {
+			temp[h] = text[m];
+			h++;
+		}
+		m++;
+	}
+	temp[h] = '\0';
+	if (strlen(temp) == 0) {
+		temp[0] = '0';
+		temp[1] = '\0';
+	}
+	strcpy_s(text, 29, temp);
+	return atoi(text);
+}
 base binput() {
 	base temp;
 	char ttm[30];
 	do
 	{
 		cl();
-		cout << "Input type(p = printer, computer_block = c, monitor = m, keyboard = k, mouse = o, scaner = a ): ";
+		cout << "( p = printer )\n( computer_block = c )\n( monitor = m )\n( keyboard = k )\n( mouse = o )\n( scaner = a )\nInput type: ";
 		cin >> temp.type;
 	} while (temp.type != 'p' && temp.type != 'c' && temp.type != 'm' && temp.type != 'k' && temp.type != 'o' && temp.type != 'a');
 	cl();
@@ -225,12 +246,14 @@ base binput() {
 		do
 		{
 			cout << "Input screen width: ";
-			cin >> temp.u.mn.screen_width;
+			cin.getline(ttm, 29);
+			temp.u.mn.screen_width = onlynums(ttm);
 		} while (temp.u.mn.screen_width < 1);
 		do
 		{
 			cout << "Input screen height: ";
-			cin >> temp.u.mn.screen_height;
+			cin.getline(ttm, 29);
+			temp.u.mn.screen_height = onlynums(ttm);
 		} while (temp.u.mn.screen_height < 1);
 		break;
 	case 'k':
@@ -254,41 +277,131 @@ base binput() {
 		do
 		{
 			cout << "Input scan width: ";
-			cin >> temp.u.scn.scan_width;
+			cin.getline(ttm, 29);
+			temp.u.scn.scan_width = onlynums(ttm);
 		} while (temp.u.scn.scan_width < 1);
 		do
 		{
-			cout << "Input scan width: ";
-			cin >> temp.u.scn.scan_height;
+			cout << "Input scan height: ";
+			cin.getline(ttm, 29);
+			temp.u.scn.scan_height = onlynums(ttm);
 		} while (temp.u.scn.scan_height < 1);
 		break;
 	}
 	do
 	{
 		cout << "Input width: ";
-		cin >> temp.width;
+		cin.getline(ttm, 29);
+		temp.width = onlynums(ttm);
 	} while (temp.width < 1);
 	do
 	{
 		cout << "Input height: ";
-		cin >> temp.height;
+		cin.getline(ttm, 29);
+		temp.height = onlynums(ttm);
 	} while (temp.height < 1);
 	do
 	{
 		cout << "Input sum: ";
-		cin >> temp.kol;
+		cin.getline(ttm, 29);
+		temp.kol = onlynums(ttm);
 	} while (temp.kol < 1);
 	do
 	{
 		cout << "Input price in dollars: ";
-		cin >> temp.buy_dollars;
+		cin.getline(ttm, 29);
+		temp.buy_dollars = onlynums(ttm);
 	} while (temp.buy_dollars < 1);
 	do
 	{
 		cout << "Input price in grn: ";
-		cin >> temp.buy_grn;
+		cin.getline(ttm, 29);
+		temp.buy_grn = onlynums(ttm);
 	} while (temp.buy_grn < 1);
 	return temp;
+}
+
+base* AddOneToMass(base *bs, int &size, base oo) {
+	base *tempbase = new base[size + 1];
+	for (int i = 0; i < size; i++)
+	{
+		tempbase[i] = bs[i];
+	}
+	tempbase[size] = oo;
+	size++;
+	delete[] bs;
+	bs = tempbase;
+	return bs;
+}
+
+base* DeleteOneToMass(base *bs, int &size, int index) {
+	base *tempbase = new base[size - 1];
+	for (int i = 0; i < index; i++)
+	{
+		tempbase[i] = bs[i];
+	}
+	for (int i = index + 1; i < size; i++)
+	{
+		tempbase[i - 1] = bs[i];
+	}
+	delete[] bs;
+	bs = tempbase;
+	size--;
+	return bs;
+}
+
+base* FileToMass(fstream &f, base *bs, int &size) {
+	if (f.is_open()) {
+		base temp;
+		while (f.read(reinterpret_cast<char *>(&temp), sizeof(base)))
+		{
+			bs = AddOneToMass(bs, size, temp);
+		}
+	}
+	return bs;
+}
+
+base* synhronize(const char *fname, base * bs, int &size) {
+	fstream f(fname, ios::in);
+	char temp;
+	if (f.is_open()) {
+		bs = FileToMass(f, bs, size);
+		f.close();
+	}
+	else
+	{
+		f.open(fname, ios::out);
+		while (true)
+		{
+			base tt = binput();
+			f.write(reinterpret_cast<char *>(&tt), sizeof(base));
+			do
+			{
+				cout << "Continue inputing (y = yes, n = not):";
+				cin >> temp;
+			} while (temp != 'y' && temp != 'Y' && temp != 'N' && temp != 'n');
+			cl();
+			if (temp == 'n' || temp == 'N') break;
+		}
+		f.close();
+		f.open(fname, ios::in);
+		if (f.is_open()) {
+			bs = FileToMass(f, bs, size);
+			f.close();
+		}
+	}
+	return bs;
+}
+
+void InputBToFile(const char *fname, base * bs, const int size) {
+	fstream f(fname, ios::out);
+	if (f.is_open()) {
+		for (int i = 0; i < size; i++)
+		{
+			f.write(reinterpret_cast<char *>(&bs[i]), sizeof(base));
+		}
+		f.close();
+	}
 }
 
 void message_send(char *msg) {
@@ -307,11 +420,33 @@ void message_send(char *msg) {
 	}
 }
 
+const char* ysno(bool in) {
+	if (in) {
+		return "Yes";
+	}
+	else
+	{
+		return "No";
+	}
+}
+
+void CoutAll(base * bs, const int size) {
+	cout << "\t\t\t\tPRITERS" << endl << endl;
+	cout << setw(4) << 'ID' << setw(19) << "Name" << setw(30) << "Is multti color" << setw(30) << "Type" << setw(30) << "With scaner" << endl;
+	for (int i = 0; i < size; i++)
+	{
+		if (bs[i].type == 'p') {
+			cout << setw(4) << i + 1 << setw(19) << bs[i].name << setw(19) << ysno(bs[i].u.pr.Multi_color_cartridge) << setw(6) << ysno(bs[i].u.pr.with_scaner) << endl;
+		}
+	}
+}
+
 void main() {
-	base my = binput();
-	/*char message[301] = { "Hello in main base!" }, filename[20] = { "my.txt" };
+	int size = 0, menu = 0;
 	bool exit = false;
-	int menu = 0;
+	char message[301] = { "Hello in main base!" }, filename[20] = { "my.txt" };
+	base *bs = nullptr;
+	bs = synhronize(filename, bs, size);
 	while (!exit) {
 		cl();
 		message_send(message);
@@ -319,9 +454,11 @@ void main() {
 			if (strlen(message) > 0) message[0] = '\0';
 			switch (menu)
 			{
-			default:
-				break;
+				case 0:
+					exit = true;
+					break;
+
 			}
 		}
-	}*/
+	}
 }
