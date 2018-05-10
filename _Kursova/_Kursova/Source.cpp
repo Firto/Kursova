@@ -12,71 +12,122 @@ void cl() {
 	system("cls");
 }
 
+void gotoxy (int x, int y) {
+    COORD coordinates = { x, y };
+    HANDLE outputHandle = GetStdHandle (STD_OUTPUT_HANDLE);
+
+    SetConsoleCursorPosition (outputHandle, coordinates);
+}
+
 // MENU /////////////////////////////////////////////////////////////////////////////////
 
-void addvpos(char *ai, int to) {
-	int max = strlen(ai), h;
-	ai[max + 1] = ' ';
-	h = max;
-	while (h >= to)
-	{
-		swap(ai[h + 1], ai[h]);
-		h--;
-	}
-	max = strlen(ai);
-	ai[max + 1] = '>';
-	h = max;
-	while (h >= to)
-	{
-		swap(ai[h + 1], ai[h]);
-		h--;
-	}
-}
-void correct(char *ai) {
-	int h = 0;
-	while (ai[h] != '\0')
-	{
-		if (ai[h] == '|') ai[h] = '\n';
-		h++;
-	}
-}
-void addzn(char *ai, int to) {
-	int om = 0, h = 0, konets;
-	while (ai[h] != '\0')
-	{
-		if (ai[h] == '|' && om != to) {
-			om++;
+//void addvpos(char *ai, int to) {
+//	int max = strlen(ai), h;
+//	ai[max + 1] = ' ';
+//	h = max;
+//	while (h >= to)
+//	{
+//		swap(ai[h + 1], ai[h]);
+//		h--;
+//	}
+//	max = strlen(ai);
+//	ai[max + 1] = '>';
+//	h = max;
+//	while (h >= to)
+//	{
+//		swap(ai[h + 1], ai[h]);
+//		h--;
+//	}
+//}
+//void correct(char *ai) {
+//	int h = 0;
+//	while (ai[h] != '\0')
+//	{
+//		if (ai[h] == '|') ai[h] = '\n';
+//		h++;
+//	}
+//}
+//void addzn(char *ai, int to) {
+//	int om = 0, h = 0, konets;
+//	while (ai[h] != '\0')
+//	{
+//		if (ai[h] == '|' && om != to) {
+//			om++;
+//		}
+//		else if (om == to) {
+//			konets = h;
+//			break;
+//		}
+//		h++;
+//	}
+//	addvpos(ai, konets);
+//	correct(ai);
+//}
+
+char ** menussu(char ** to, int &size, char *in) {
+	char** mass_1 = new char*[size + 1];
+	for (int i = 0; i < size + 1; i++) {
+		if (i != size) mass_1[i] = to[i];
+		else {
+			mass_1[i] = in;
 		}
-		else if (om == to) {
-			konets = h;
-			break;
-		}
-		h++;
 	}
-	addvpos(ai, konets);
-	correct(ai);
+	size++;
+	//delete[] mass;
+	return mass_1;
 }
-int menus(const char *pnkts, int size, int &menu) {
+
+int menus(const char *pnkts, int &menu) {
 	char act;
-	int ch = 0;
-	char temp[1001];
+	int ch = 0, size = 0;
+	char temp[1001] ;
 	strcpy_s(temp, 1000, pnkts);
-	addzn(temp, menu);
-	cout << temp << endl;
-	while (ch != 13 && ch != 80 && ch != 72)
+	int te_menu = -1;
+	CONSOLE_SCREEN_BUFFER_INFO bi;
+	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &bi);
+	int to_pos_x = bi.dwCursorPosition.X;
+	int to_pos_y = bi.dwCursorPosition.Y;
+	char **menuu = nullptr;
+	char *nxt_tokin = NULL, *tokin = strtok_s(temp, "|", &nxt_tokin);
+	while (tokin != nullptr) {
+		menuu = menussu(menuu, size, tokin);
+		tokin = strtok_s(NULL, "|", &nxt_tokin);
+	}
+	for (int i = 0; i < size; i++)
 	{
-		act = _getch();// считываю
-		ch = static_cast<int>(act);//привожу к соответствующему коду
-		switch (ch)
+		cout << "   ";
+		cout << menuu[i] << endl;
+	}
+	while (ch != 13)
+	{
+		ch = 0;
+		if (te_menu > -1) { 
+			gotoxy(0, to_pos_y + te_menu);
+			cout << "   ";
+			cout << menuu[te_menu] << "\0\0\0\0\0\0\0\0\0\0\0\0";
+		}
+		gotoxy(0, to_pos_y + menu);
+		cout << ">> ";
+		cout << menuu[menu] << "\0\0\0\0\0\0\0\0\0\0\0\0";
+		while (ch != 13 && ch != 80 && ch != 72)
 		{
-		case 80: // вниз
-			if (menu < size - 1) menu++;
-			//else menu = 0;
-			break;
-		case 72: // вверх
-			if (menu > 0) menu--;
-			//else menu = size - 1;
-			break;
+			act = _getch();// считываю
+			ch = static_cast<int>(act);//привожу к соответствующему коду
+			switch (ch)
+			{
+			case 80: // вниз
+				te_menu = menu;
+				if (menu < size - 1) { menu++; }
+				
+				//else menu = 0;
+				break;
+			case 72: // вверх
+				te_menu = menu;
+				if (menu > 0) { menu--; }
+				
+				//else menu = size - 1;
+				break;
+			}
 		}
 	}
 	return ch;
@@ -418,6 +469,7 @@ void message_send(char *msg) {
 		}
 		cout << endl;
 	}
+	msg[0] = '\0';
 }
 
 const char* ysno(bool in) {
@@ -450,15 +502,13 @@ void main() {
 	while (!exit) {
 		cl();
 		message_send(message);
-		if (menus("Exit|Go|Splash", 3, menu) == 13) {
-			if (strlen(message) > 0) message[0] = '\0';
-			switch (menu)
-			{
-				case 0:
-					exit = true;
-					break;
+		menus("Exit|Go|Splash|sdfsdfsdf|dsfsdfsd|sdfsdfsdf|sdfsdf", menu);
+		switch (menu)
+		{
+			case 0:
+			exit = true;
+			break;
 
-			}
 		}
 	}
 }
