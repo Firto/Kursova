@@ -21,48 +21,14 @@ void gotoxy (int x, int y) {
 
 // MENU /////////////////////////////////////////////////////////////////////////////////
 
-//void addvpos(char *ai, int to) {
-//	int max = strlen(ai), h;
-//	ai[max + 1] = ' ';
-//	h = max;
-//	while (h >= to)
-//	{
-//		swap(ai[h + 1], ai[h]);
-//		h--;
-//	}
-//	max = strlen(ai);
-//	ai[max + 1] = '>';
-//	h = max;
-//	while (h >= to)
-//	{
-//		swap(ai[h + 1], ai[h]);
-//		h--;
-//	}
-//}
-//void correct(char *ai) {
-//	int h = 0;
-//	while (ai[h] != '\0')
-//	{
-//		if (ai[h] == '|') ai[h] = '\n';
-//		h++;
-//	}
-//}
-//void addzn(char *ai, int to) {
-//	int om = 0, h = 0, konets;
-//	while (ai[h] != '\0')
-//	{
-//		if (ai[h] == '|' && om != to) {
-//			om++;
-//		}
-//		else if (om == to) {
-//			konets = h;
-//			break;
-//		}
-//		h++;
-//	}
-//	addvpos(ai, konets);
-//	correct(ai);
-//}
+const POINT pos_cur() {
+	POINT pos;
+	CONSOLE_SCREEN_BUFFER_INFO bi;
+	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &bi);
+	pos.x = bi.dwCursorPosition.X;
+	pos.y = bi.dwCursorPosition.Y;
+	return pos;
+}
 
 char ** menussu(char ** to, int &size, char *in) {
 	char** mass_1 = new char*[size + 1];
@@ -83,10 +49,8 @@ int menus(const char *pnkts, int &menu) {
 	char temp[1001] ;
 	strcpy_s(temp, 1000, pnkts);
 	int te_menu = -1;
-	CONSOLE_SCREEN_BUFFER_INFO bi;
-	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &bi);
-	int to_pos_x = bi.dwCursorPosition.X;
-	int to_pos_y = bi.dwCursorPosition.Y;
+	int to_pos_x = pos_cur().x;
+	int to_pos_y = pos_cur().y;
 	char **menuu = nullptr;
 	char *nxt_tokin = NULL, *tokin = strtok_s(temp, "|", &nxt_tokin);
 	while (tokin != nullptr) {
@@ -104,11 +68,9 @@ int menus(const char *pnkts, int &menu) {
 		if (te_menu > -1) { 
 			gotoxy(0, to_pos_y + te_menu);
 			cout << "   ";
-			cout << menuu[te_menu] << "\0\0\0\0\0\0\0\0\0\0\0\0";
 		}
 		gotoxy(0, to_pos_y + menu);
 		cout << ">> ";
-		cout << menuu[menu] << "\0\0\0\0\0\0\0\0\0\0\0\0";
 		while (ch != 13 && ch != 80 && ch != 72)
 		{
 			act = _getch();// считываю
@@ -482,18 +444,37 @@ const char* ysno(bool in) {
 	}
 }
 
-void CoutAll(base * bs, const int size) {
-	cout << "\t\t\t\tPRITERS" << endl << endl;
-	cout << setw(4) << 'ID' << setw(19) << "Name" << setw(30) << "Is multti color" << setw(30) << "Type" << setw(30) << "With scaner" << endl;
+HANDLE hCon = GetStdHandle(STD_OUTPUT_HANDLE);
+CONSOLE_SCREEN_BUFFER_INFO csbInfo;
+int GetBufferChars()
+{
+	GetConsoleScreenBufferInfo(hCon, &csbInfo);
+	return csbInfo.srWindow.Right - csbInfo.srWindow.Left + 1;
+	 
+}
+void fullline(char a) {
+	for (int i = 0; i < GetBufferChars()-1; i++)
+	{
+		cout << a;
+	}
+	cout << endl;
+}
+void CoutNOAll(base * bs, const int size) {
+	cout << setw(GetBufferChars()/2) << "PRITERS" << endl;
+	fullline('-');
+	cout << setw(6) << "ID" << "|" << setw(19) << "Kol" << "|" << setw(10) << "Width" << "|" << setw(10) << "Height" << "|" << setw(6) << "USD" << "|" << setw(6) << "GRN" << "|" << endl;
+	fullline('-');
 	for (int i = 0; i < size; i++)
 	{
 		if (bs[i].type == 'p') {
-			cout << setw(4) << i + 1 << setw(19) << bs[i].name << setw(19) << ysno(bs[i].u.pr.Multi_color_cartridge) << setw(6) << ysno(bs[i].u.pr.with_scaner) << endl;
+			cout << setw(6) << i + 1 << "|" << setw(19) << bs[i].kol << "|" << setw(10) << bs[i].width << "|" << setw(10) << bs[i].height << "|" << setw(6) << bs[i].buy_dollars << "|" << setw(6) << bs[i].buy_grn << "|" << endl;
+			fullline('-');
 		}
+
 	}
 }
-
 void main() {
+	
 	int size = 0, menu = 0;
 	bool exit = false;
 	char message[301] = { "Hello in main base!" }, filename[20] = { "my.txt" };
@@ -501,6 +482,7 @@ void main() {
 	bs = synhronize(filename, bs, size);
 	while (!exit) {
 		cl();
+		CoutNOAll(bs, size);
 		message_send(message);
 		menus("Exit|Go|Splash|sdfsdfsdf|dsfsdfsd|sdfsdfsdf|sdfsdf", menu);
 		switch (menu)
