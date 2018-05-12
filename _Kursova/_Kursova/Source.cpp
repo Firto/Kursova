@@ -19,6 +19,15 @@ void gotoxy (int x, int y) {
     SetConsoleCursorPosition (outputHandle, coordinates);
 }
 
+HANDLE hCon = GetStdHandle(STD_OUTPUT_HANDLE);
+CONSOLE_SCREEN_BUFFER_INFO csbInfo;
+int GetBufferChars()
+{
+	GetConsoleScreenBufferInfo(hCon, &csbInfo);
+	return csbInfo.srWindow.Right;
+
+}
+
 // MENU /////////////////////////////////////////////////////////////////////////////////
 
 const POINT pos_cur() {
@@ -29,6 +38,49 @@ const POINT pos_cur() {
 	pos.y = bi.dwCursorPosition.Y;
 	return pos;
 }
+
+void clearToPos(POINT pos) {
+	POINT current_pos = pos_cur();
+	while (current_pos.y >= pos.y)
+	{
+		if (current_pos.y > pos.y) {
+			gotoxy(0, current_pos.y);
+			for (int i = 0; i < GetBufferChars(); i++)
+			{
+				cout << " ";
+			}
+		}
+		else if (current_pos.y == pos.y) {
+			gotoxy(pos.x, current_pos.y);
+			if (current_pos.x != pos.x) for (int i = 0; i < GetBufferChars() - pos.x; i++)
+			{
+				cout << " ";
+			}
+		}
+
+		current_pos.y--;
+	}
+	gotoxy(pos.x, pos.y);
+}
+
+enum ConsoleColor {
+	Black = 0,
+	Blue = 1,
+	Green = 2,
+	Cyan = 3,
+	Red = 4,
+	Magenta = 5,
+	Brown = 6,
+	LightGray = 7,
+	DarkGray = 8,
+	LightBlue = 9,
+	LightGreen = 10,
+	LightCyan = 11,
+	LightRed = 12,
+	LightMagenta = 13,
+	Yellow = 14,
+	White = 15
+};
 
 char ** menussu(char ** to, int &size, char *in) {
 	char** mass_1 = new char*[size + 1];
@@ -75,21 +127,21 @@ int menus(const char *pnkts, int &menu) {
 		{
 			act = _getch();// считываю
 			ch = static_cast<int>(act);//привожу к соответствующему коду
-			switch (ch)
-			{
-			case 80: // вниз
-				te_menu = menu;
-				if (menu < size - 1) { menu++; }
-				
-				//else menu = 0;
-				break;
-			case 72: // вверх
-				te_menu = menu;
-				if (menu > 0) { menu--; }
-				
-				//else menu = size - 1;
-				break;
-			}
+		}
+		switch (ch)
+		{
+		case 80: // вниз
+			te_menu = menu;
+			if (menu < size - 1) { menu++; }
+
+			//else menu = 0;
+			break;
+		case 72: // вверх
+			te_menu = menu;
+			if (menu > 0) { menu--; }
+
+			//else menu = size - 1;
+			break;
 		}
 	}
 	return ch;
@@ -143,11 +195,13 @@ struct base
 };
 
 bool yesno(const char * text) {
-
+	POINT current_pos = pos_cur();
 	char ttm[30];
+	cout << text;
+	current_pos = pos_cur();
 	do
 	{
-		cout << text;
+		clearToPos(current_pos);
 		cin.getline(ttm, 29);
 	} while (strcmp(ttm, "yes") != 0 && strcmp(ttm, "Yes") != 0 && strcmp(ttm, "Y") != 0 && strcmp(ttm, "y") != 0 &&  strcmp(ttm, "No") != 0 && strcmp(ttm, "no") != 0 && strcmp(ttm, "n") != 0 && strcmp(ttm, "N") != 0);
 
@@ -177,9 +231,22 @@ int onlynums(char *text) {
 	strcpy_s(text, 29, temp);
 	return atoi(text);
 }
+
+void toLine(const char * in, char * out, int size) {
+	POINT pos_curr;
+	cout << in;
+	pos_curr = pos_cur();
+	do
+	{
+		clearToPos(pos_curr);
+		cin.getline(out, 29);
+	} while (strlen(out) < 1);
+}
+
 base binput() {
 	base temp;
 	char ttm[30];
+	POINT pos_curr;
 	do
 	{
 		cl();
@@ -210,127 +277,115 @@ base binput() {
 		cout << "// Inputing scaner \\\\" << endl;
 		break;
 	}
-	do
-	{
-		cout << "Input name: ";
-		cin.getline(temp.name, 29);
-	} while (strlen(temp.name) < 1);
+	toLine("Input name: ", temp.name, 29);
 	switch (temp.type)
 	{
 	case 'p':
-		do
-		{
-			cout << "Input type: ";
-			cin.getline(temp.u.pr.type, 29);
-		} while (strlen(temp.u.pr.type) < 1);
+		toLine("Input type: ", temp.u.pr.type, 29);
 		temp.u.pr.Multi_color_cartridge = yesno("Input multi color (Yes or No): ");
 		temp.u.pr.with_scaner = yesno("Input scaner (Yes or No): ");
 		
 		break;
 	case 'c':
-		do
-		{
-			cout << "Input name processor: ";
-			cin.getline(temp.u.cbl.name_processor, 29);
-		} while (strlen(temp.u.cbl.name_processor) < 1);
-		do
-		{
-			cout << "Input name power block: ";
-			cin.getline(temp.u.cbl.name_power_block, 29);
-		} while (strlen(temp.u.cbl.name_power_block) < 1);
-		do
-		{
-			cout << "Input name motherboard: ";
-			cin.getline(temp.u.cbl.name_mat_plat, 29);
-		} while (strlen(temp.u.cbl.name_mat_plat) < 1);
-		do
-		{
-			cout << "Input name videocard: ";
-			cin.getline(temp.u.cbl.name_vid_card, 29);
-		} while (strlen(temp.u.cbl.name_vid_card) < 1);
+		toLine("Input name processor: ", temp.u.cbl.name_processor, 29);
+		toLine("Input name power block: ", temp.u.cbl.name_power_block, 29);
+		toLine("Input name motherboard: ", temp.u.cbl.name_mat_plat, 29);
+		toLine("Input name videocard: ", temp.u.cbl.name_vid_card, 29);
 		temp.u.cbl.windows_in = yesno("Input windows installed (Yes or No): ");
 		break;
 	case 'm':
+		toLine("Input screen type: ", temp.u.mn.matric_type, 29);
+		cout << "Input screen width: ";
+		pos_curr = pos_cur();
 		do
 		{
-			cout << "Input screen type: ";
-			cin.getline(temp.u.mn.matric_type, 29);
-		} while (strlen(temp.u.mn.matric_type) < 1);
-		do
-		{
-			cout << "Input screen width: ";
+			clearToPos(pos_curr);
 			cin.getline(ttm, 29);
 			temp.u.mn.screen_width = onlynums(ttm);
 		} while (temp.u.mn.screen_width < 1);
+
+		cout << "Input screen height: ";
+		pos_curr = pos_cur();
 		do
 		{
-			cout << "Input screen height: ";
+			clearToPos(pos_curr);
 			cin.getline(ttm, 29);
 			temp.u.mn.screen_height = onlynums(ttm);
 		} while (temp.u.mn.screen_height < 1);
 		break;
 	case 'k':
-		do
-		{
-			cout << "Input type: ";
-			cin.getline(temp.u.kbrd.type_keyb, 29);
-		} while (strlen(temp.u.kbrd.type_keyb) < 1);
-		break;
+		toLine("Input type: ", temp.u.kbrd.type_keyb, 29);
 		temp.u.kbrd.with_ua = yesno("Input with Ukrainian keys (Yes or No): ");
-	case 'o':
-		do
-		{
-			cout << "Input type sensor: ";
-			cin.getline(temp.u.mous.type_sensor, 29);
-		} while (strlen(temp.u.mous.type_sensor) < 1);
 		break;
+	case 'o':
+		toLine("Input type sensor: ", temp.u.mous.type_sensor, 29);
 		temp.u.mous.with_shnur = yesno("Input with shnur (Yes or No): ");
 		break;
 	case 'a':
+		cout << "Input scan width: ";
+		pos_curr = pos_cur();
 		do
 		{
-			cout << "Input scan width: ";
+			clearToPos(pos_curr);
 			cin.getline(ttm, 29);
 			temp.u.scn.scan_width = onlynums(ttm);
 		} while (temp.u.scn.scan_width < 1);
+		cout << "Input scan height: ";
+		pos_curr = pos_cur();
 		do
 		{
-			cout << "Input scan height: ";
+			clearToPos(pos_curr);
 			cin.getline(ttm, 29);
 			temp.u.scn.scan_height = onlynums(ttm);
 		} while (temp.u.scn.scan_height < 1);
 		break;
 	}
+
+	cout << "Input width: ";
+	pos_curr = pos_cur();
 	do
 	{
-		cout << "Input width: ";
+		clearToPos(pos_curr);
 		cin.getline(ttm, 29);
 		temp.width = onlynums(ttm);
 	} while (temp.width < 1);
+
+	cout << "Input height: ";
+	pos_curr = pos_cur();
 	do
 	{
-		cout << "Input height: ";
+		clearToPos(pos_curr);
 		cin.getline(ttm, 29);
 		temp.height = onlynums(ttm);
 	} while (temp.height < 1);
+	
+	cout << "Input sum: ";
+	pos_curr = pos_cur();
 	do
 	{
-		cout << "Input sum: ";
+		clearToPos(pos_curr);
 		cin.getline(ttm, 29);
 		temp.kol = onlynums(ttm);
 	} while (temp.kol < 1);
+
+	cout << "Input price in dollars: ";
+	pos_curr = pos_cur();
 	do
 	{
-		cout << "Input price in dollars: ";
+		clearToPos(pos_curr);
 		cin.getline(ttm, 29);
 		temp.buy_dollars = onlynums(ttm);
 	} while (temp.buy_dollars < 1);
+
+	cout << "Input price in grn: ";
+	pos_curr = pos_cur();
 	do
 	{
-		cout << "Input price in grn: ";
+		clearToPos(pos_curr);
 		cin.getline(ttm, 29);
 		temp.buy_grn = onlynums(ttm);
 	} while (temp.buy_grn < 1);
+
 	return temp;
 }
 
@@ -376,7 +431,6 @@ base* FileToMass(fstream &f, base *bs, int &size) {
 
 base* synhronize(const char *fname, base * bs, int &size) {
 	fstream f(fname, ios::in);
-	char temp;
 	if (f.is_open()) {
 		bs = FileToMass(f, bs, size);
 		f.close();
@@ -388,13 +442,8 @@ base* synhronize(const char *fname, base * bs, int &size) {
 		{
 			base tt = binput();
 			f.write(reinterpret_cast<char *>(&tt), sizeof(base));
-			do
-			{
-				cout << "Continue inputing (y = yes, n = not):";
-				cin >> temp;
-			} while (temp != 'y' && temp != 'Y' && temp != 'N' && temp != 'n');
 			cl();
-			if (temp == 'n' || temp == 'N') break;
+			if (!yesno("Continue inputing (Yes or No): ")) break;
 		}
 		f.close();
 		f.open(fname, ios::in);
@@ -444,39 +493,229 @@ const char* ysno(bool in) {
 	}
 }
 
-HANDLE hCon = GetStdHandle(STD_OUTPUT_HANDLE);
-CONSOLE_SCREEN_BUFFER_INFO csbInfo;
-int GetBufferChars()
-{
-	GetConsoleScreenBufferInfo(hCon, &csbInfo);
-	return csbInfo.srWindow.Right - csbInfo.srWindow.Left + 1;
-	 
-}
-void fullline(char a) {
-	for (int i = 0; i < GetBufferChars()-1; i++)
+void fullline(char a , int font = LightGray, int back = Black) {
+	SetConsoleTextAttribute(hCon, (WORD)((back << 4) | font));
+	int _chars = GetBufferChars();
+	for (int i = 0; i < _chars; i++)
 	{
 		cout << a;
 	}
 	cout << endl;
+	SetConsoleTextAttribute(hCon, (WORD)((Black << 4) | LightGray));
 }
-void CoutNOAll(base * bs, const int size) {
-	cout << setw(GetBufferChars()/2) << "PRITERS" << endl;
-	fullline('-');
-	cout << setw(6) << "ID" << "|" << setw(19) << "Kol" << "|" << setw(10) << "Width" << "|" << setw(10) << "Height" << "|" << setw(6) << "USD" << "|" << setw(6) << "GRN" << "|" << endl;
-	fullline('-');
+void cout_cl(const char* out, int font = LightGray, int back = Black) {
+	SetConsoleTextAttribute(hCon, (WORD)((back << 4) | font));
+	cout << out;
+	SetConsoleTextAttribute(hCon, (WORD)((Black << 4) | LightGray));
+}
+void coutNoAllcolor(int i,char * name, int kol, int width, int height, int buy_dollars, int buy_grn, int promiz_kol) {
+	cout << setw(6) << i + 1;
+	cout_cl("|", promiz_kol);
+	cout << setw(24) << name;
+	cout_cl("|", promiz_kol);
+	cout << setw(6) << kol;
+	cout_cl("|", promiz_kol);
+	cout << setw(6) << width;
+	cout_cl("|", promiz_kol);
+	cout << setw(6) << height;
+	cout_cl("|", promiz_kol);
+	cout << setw(6) << buy_dollars;
+	cout_cl("|", promiz_kol);
+	cout << setw(6) << buy_grn;
+	cout_cl("|", promiz_kol);
+	cout << endl;
+}
+void punks(int colorr) {
+	cout << setw(6) << "ID";
+	cout_cl("|", colorr);
+	cout << setw(24) << "Name";
+	cout_cl("|", colorr);
+	cout << setw(6) << "Kol";
+	cout_cl("|", colorr);
+	cout << setw(6) << "Width";
+	cout_cl("|", colorr);
+	cout << setw(6) << "Height";
+	cout_cl("|", colorr);
+	cout << setw(6) << "USD";
+	cout_cl("|", colorr);
+	cout << setw(6) << "GRN";
+	cout_cl("|", colorr);
+	cout << endl;
+}
+void coutnoallone(base * bs, const int size, char in, const char *iin, const int color_items, const int color_line, const int color_row) {
+	cout << resetiosflags(ios::left) << setw((GetBufferChars() + strlen(iin)) / 2) << iin << endl;
+	fullline('-', color_items);
+	cout << setiosflags(ios::left);
+	punks(color_items);
+	fullline('-', color_items);
 	for (int i = 0; i < size; i++)
 	{
-		if (bs[i].type == 'p') {
-			cout << setw(6) << i + 1 << "|" << setw(19) << bs[i].kol << "|" << setw(10) << bs[i].width << "|" << setw(10) << bs[i].height << "|" << setw(6) << bs[i].buy_dollars << "|" << setw(6) << bs[i].buy_grn << "|" << endl;
-			fullline('-');
+		if (bs[i].type == in) {
+			coutNoAllcolor(i, bs[i].name, bs[i].kol, bs[i].width, bs[i].height, bs[i].buy_dollars, bs[i].buy_grn, color_row);
+			fullline('-', color_line);
 		}
 
 	}
 }
+void CoutNOAll(base * bs, const int size) {
+	const int color_items = 15, color_line = 4, color_row = 12;
+	coutnoallone(bs, size, 'p', "PRINTERS", color_items, color_line, color_row);
+	cout << endl;
+	coutnoallone(bs, size, 'c', "COMPUTER BLOCKS", color_items, color_line, color_row);
+	cout << endl;
+	coutnoallone(bs, size, 'm', "MONITORS", color_items, color_line, color_row);
+	cout << endl;
+	coutnoallone(bs, size, 'k', "KEYBOARDS", color_items, color_line, color_row);
+	cout << endl;
+	coutnoallone(bs, size, 'o', "MOUSES", color_items, color_line, color_row);
+	cout << endl;
+	coutnoallone(bs, size, 'a', "SCANERS", color_items, color_line, color_row);
+}
+void coutall(base * bs, const int size, const int color_items, const int color_line, const int color_row,const int start, const int finish) {
+	if (start > -1 && finish <= size) {
+		fullline('-', color_items);
+		cout << setiosflags(ios::left);
+		cout << setw(2);
+		cout << " ";
+		cout << setw(2);
+		cout << " ";
+		punks(color_items);
+		fullline('-', color_items);
+		for (int i = start; i < finish; i++)
+		{
+			cout << setw(2);
+			cout << " ";
+			cout << setw(2);
+			cout << " ";
+			coutNoAllcolor(i, bs[i].name, bs[i].kol, bs[i].width, bs[i].height, bs[i].buy_dollars, bs[i].buy_grn, color_row);
+			fullline('-', color_line);
+		}
+	}
+	else
+	{
+		fullline('-', color_items);
+		cout << setiosflags(ios::left);
+		punks(color_items);
+		fullline('-', color_items);
+		for (int i = 0; i < size; i++)
+		{
+			coutNoAllcolor(i, bs[i].name, bs[i].kol, bs[i].width, bs[i].height, bs[i].buy_dollars, bs[i].buy_grn, color_row);
+			fullline('-', color_line);
+		}
+	}
+}
+
+int SelectItems(base *bs, const int size, bool *masstoseind) {
+	char act, message[301] = { "" }, options[301] = { "BACK : B, OK : O" };
+	int ch = 0, start = 0, finish = 13, item = 0;
+	bool reload = true, exit = false, reload_back = false;
+	const int color_items = 15, color_line = 4, color_row = 12;
+	while (!exit)
+	{
+		ch = 0;
+		if (reload) {
+			cl();
+			coutall(bs, size, color_items, color_line, color_row, start, finish);
+			reload = false;
+			for (int i = start; i < finish; i++)
+			{
+				if (masstoseind[i] == true) {
+					gotoxy(2, 3 + ((i-start) * 2));
+					cout << "*";
+				}
+			
+			}
+			gotoxy(0, 29);
+			cout << options << message;
+			message[0] = '\0';
+		}
+		if (strlen(message)) {
+			gotoxy(0, 29);
+			cout << options << message;
+			message[0] = '\0';
+		}
+		else {
+			gotoxy(0, 29);
+			int _chars = GetBufferChars();
+			for (int i = 0; i < _chars; i++)
+			{
+				cout << ' ';
+			}
+			gotoxy(0, 29);
+			cout << options;
+		}
+		if (item > 0 && item < finish - 1) {
+			gotoxy(0, 3 + ((item - 1 - start) * 2));
+			cout << " ";
+			gotoxy(0, 3 + ((item + 1 - start) * 2));
+			cout << " ";
+		}
+		else
+		if (item == 0) {
+			gotoxy(0, 3 + ((item + 1 - start) * 2));
+			cout << " ";
+		}
+		else
+		if (item == finish-1) {
+			gotoxy(0, 3 + ((item - 1 - start) * 2));
+			cout << " ";
+		}
+		
+		gotoxy(0, 3 + ((item - start) * 2));
+		cout << ">";
+		while (ch != 13 && ch != 80 && ch != 72 && ch != -87 && ch != -23)
+		{
+			act = _getch();
+			ch = static_cast<int>(act);//привожу к соответствующему коду
+			switch (ch)
+			{
+			case 80: // вниз
+				if (item < size - 1) item++; 
+				else ch = 0;
+				if (item+1 > finish && finish < size && ch != 0) {
+					finish++;
+					start++;
+					reload = true;
+				}
+				break;
+			case 72: // вверх
+				if (item > 0) item--;
+				else ch = 0;
+				if (item < start && start > 0 && ch != 0) {
+					finish--;
+					start--;
+					reload = true;
+				}
+				break;
+			case -87:
+				exit = true;
+				break;
+			case -23:
+				for (int i = 0; i < size; i++)
+				{
+					if (masstoseind[i]) return 1;
+				}
+				strcpy_s(message, 300, " | None Selected |");
+				break;
+			case 13:
+				if (!masstoseind[item]) {
+					masstoseind[item] = true;
+					cout << " *";
+				}
+				else { 
+					masstoseind[item] = false;
+					cout << "  ";
+				}
+				break;
+			}
+		}
+	}
+	return 0;
+}
 void main() {
 	
-	int size = 0, menu = 0;
-	bool exit = false;
+	int size = 0, menu = 1;
+	bool exit = false, *mass = new bool[size];
 	char message[301] = { "Hello in main base!" }, filename[20] = { "my.txt" };
 	base *bs = nullptr;
 	bs = synhronize(filename, bs, size);
@@ -484,13 +723,70 @@ void main() {
 		cl();
 		CoutNOAll(bs, size);
 		message_send(message);
-		menus("Exit|Go|Splash|sdfsdfsdf|dsfsdfsd|sdfsdfsdf|sdfsdf", menu);
+		menus("Exit|Cout all of index|Add New Vehicle", menu);
 		switch (menu)
 		{
 			case 0:
 			exit = true;
 			break;
+			case 1:
+				for (int i = 0; i < size; i++)
+				{
+					mass[i] = false;
+				}
+				if (SelectItems(bs, size, mass)) {
+					cl();
+					for (int i = 0; i < size; i++)
+					{
+						if (mass[i]) {
+							fullline('-', LightRed);
+							cout << "Index\t: " << i + 1 << endl;
+							cout << "\tType: ";
+							switch (bs[i].type)
+							{
 
+							case 'p':
+								cout << "Printers";
+								break;
+							case 'c':
+								cout << "Computer block";
+								break;
+							case 'm':
+								cout << "Monitor";
+								break;
+							case 'k':
+								cout << "Keyboard";
+								break;
+							case 'o':
+								cout << "Mouse";
+								break;
+							case 'a':
+								cout << "Scaner";
+								break;
+							}
+							cout << endl;
+							cout << "\tName\t: " << bs[i].name << endl;
+							cout << "\tHow many\t: " << bs[i].kol << endl;
+							cout << "\tWidth\t: " << bs[i].width << endl;
+							cout << "\tHeigth\t: " << bs[i].height << endl;
+							cout << "\tBut in GRN\t: " << bs[i].buy_dollars << endl;
+							cout << "\tBut in USD\t: " << bs[i].buy_grn << endl;
+							
+						}
+					}
+				while (!yesno("<< Back (Yes or No): "));
+				}else strcpy_s(message, 300, " | You in main menu |");
+				break;
+			case 2:
+				while (true)
+				{
+					base tt = binput();
+					bs = AddOneToMass(bs, size, tt);
+					cl();
+					if (!yesno("Continue inputing (Yes or No): ")) break;
+				}
+				break;
 		}
 	}
+	InputBToFile(filename, bs, size);
 }
