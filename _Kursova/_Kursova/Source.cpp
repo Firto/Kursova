@@ -5,6 +5,9 @@
 #include <conio.h>
 #include <fstream>
 #include <iomanip>
+#include <sstream>
+
+float usd_to_grn;
 
 using namespace std;
 
@@ -24,10 +27,24 @@ CONSOLE_SCREEN_BUFFER_INFO csbInfo;
 int GetBufferChars()
 {
 	GetConsoleScreenBufferInfo(hCon, &csbInfo);
-	return csbInfo.srWindow.Right;
+	return csbInfo.srWindow.Right - csbInfo.srWindow.Left;
 
 }
 
+int GetBufferCharsbot() {
+	GetConsoleScreenBufferInfo(hCon, &csbInfo);
+	return csbInfo.srWindow.Bottom - csbInfo.srWindow.Top;
+}
+
+const char* ftoa(float num) {
+	stringstream iostr;
+	char *s, *ss;
+
+	s = new char[30];
+	iostr << num;
+	iostr >> s;
+	return s;
+}
 // MENU /////////////////////////////////////////////////////////////////////////////////
 
 const POINT pos_cur() {
@@ -47,14 +64,14 @@ void clearToPos(POINT pos) {
 			gotoxy(0, current_pos.y);
 			for (int i = 0; i < GetBufferChars(); i++)
 			{
-				cout << " ";
+				cout << '\0';
 			}
 		}
 		else if (current_pos.y == pos.y) {
 			gotoxy(pos.x, current_pos.y);
 			if (current_pos.x != pos.x) for (int i = 0; i < GetBufferChars() - pos.x; i++)
 			{
-				cout << " ";
+				cout << '\0';
 			}
 		}
 
@@ -151,7 +168,7 @@ int menus(const char *pnkts, int &menu) {
 
 struct printer {
 	bool Multi_color_cartridge, with_scaner;
-	char name[30], type[30];
+	char type[30];
 };
 
 struct computer_bl {
@@ -190,7 +207,8 @@ union s {
 struct base
 {
 	char type, name[30];
-	int width, height, buy_dollars, buy_grn, kol;
+	int width, height, kol;
+	float buy;
 	s u;
 };
 
@@ -212,15 +230,16 @@ bool yesno(const char * text) {
 		return false;
 	}
 }
-int onlynums(char *text) {
-	char temp[31];
+float onlynums(char *text) {
+	char temp[30];
 	int h = 0, m = 0;
 	while (text[m] != '\0')
 	{
-		if (text[m] >= '0' && text[m] <= '9') {
+		if (text[m] >= '0' && text[m] <= '9' || (text[m] == '.' && h>0 && text[m-1] >= '0' && text[m-1] <= '9')) {
 			temp[h] = text[m];
 			h++;
 		}
+		else return 0;
 		m++;
 	}
 	temp[h] = '\0';
@@ -229,7 +248,7 @@ int onlynums(char *text) {
 		temp[1] = '\0';
 	}
 	strcpy_s(text, 29, temp);
-	return atoi(text);
+	return atof(text);
 }
 
 void toLine(const char * in, char * out, int size) {
@@ -245,7 +264,7 @@ void toLine(const char * in, char * out, int size) {
 
 base binput() {
 	base temp;
-	char ttm[30];
+	char ttm[30], tmtm;
 	POINT pos_curr;
 	do
 	{
@@ -368,23 +387,27 @@ base binput() {
 		temp.kol = onlynums(ttm);
 	} while (temp.kol < 1);
 
-	cout << "Input price in dollars: ";
+	cout << "Input type of price (g = grn, u = usd): ";
+	pos_curr = pos_cur();
+	do
+	{
+		clearToPos(pos_curr);
+		cin >> tmtm;
+	} while (tmtm != 'u' && tmtm != 'g');
+	if (tmtm == 'g') {
+		cout << "Input price in grn: ";
+	}
+	else if (tmtm == 'u') {
+		cout << "Input price in usd: ";
+	}
 	pos_curr = pos_cur();
 	do
 	{
 		clearToPos(pos_curr);
 		cin.getline(ttm, 29);
-		temp.buy_dollars = onlynums(ttm);
-	} while (temp.buy_dollars < 1);
-
-	cout << "Input price in grn: ";
-	pos_curr = pos_cur();
-	do
-	{
-		clearToPos(pos_curr);
-		cin.getline(ttm, 29);
-		temp.buy_grn = onlynums(ttm);
-	} while (temp.buy_grn < 1);
+		if (tmtm == 'u') temp.buy = onlynums(ttm);
+		else if (tmtm == 'g') temp.buy = onlynums(ttm)/usd_to_grn;
+	} while (temp.buy <= 0);
 
 	return temp;
 }
@@ -418,9 +441,26 @@ base* DeleteOneToMass(base *bs, int &size, int index) {
 	return bs;
 }
 
+bool* DeleteOneToMassI(bool *bs, int &size, int index) {
+	bool *tempbase = new bool[size - 1];
+	for (int i = 0; i < index; i++)
+	{
+		tempbase[i] = bs[i];
+	}
+	for (int i = index + 1; i < size; i++)
+	{
+		tempbase[i - 1] = bs[i];
+	}
+	delete[] bs;
+	bs = tempbase;
+	size--;
+	return bs;
+}
+
 base* FileToMass(fstream &f, base *bs, int &size) {
 	if (f.is_open()) {
 		base temp;
+		f.read(reinterpret_cast<char *>(&usd_to_grn), sizeof(int));
 		while (f.read(reinterpret_cast<char *>(&temp), sizeof(base)))
 		{
 			bs = AddOneToMass(bs, size, temp);
@@ -430,6 +470,8 @@ base* FileToMass(fstream &f, base *bs, int &size) {
 }
 
 base* synhronize(const char *fname, base * bs, int &size) {
+	POINT pos_curr;
+	char ttm[30];
 	fstream f(fname, ios::in);
 	if (f.is_open()) {
 		bs = FileToMass(f, bs, size);
@@ -438,6 +480,16 @@ base* synhronize(const char *fname, base * bs, int &size) {
 	else
 	{
 		f.open(fname, ios::out);
+
+		cout << "Input Kurs 1 USD to GRN: ";
+		pos_curr = pos_cur();
+		do
+		{
+			clearToPos(pos_curr);
+			cin.getline(ttm, 29);
+			usd_to_grn = onlynums(ttm);
+		} while (usd_to_grn <= 0);
+		f.write(reinterpret_cast<char *>(&usd_to_grn), sizeof(float));
 		while (true)
 		{
 			base tt = binput();
@@ -458,6 +510,7 @@ base* synhronize(const char *fname, base * bs, int &size) {
 void InputBToFile(const char *fname, base * bs, const int size) {
 	fstream f(fname, ios::out);
 	if (f.is_open()) {
+		f.write(reinterpret_cast<char *>(&usd_to_grn), sizeof(float));
 		for (int i = 0; i < size; i++)
 		{
 			f.write(reinterpret_cast<char *>(&bs[i]), sizeof(base));
@@ -503,12 +556,13 @@ void fullline(char a , int font = LightGray, int back = Black) {
 	cout << endl;
 	SetConsoleTextAttribute(hCon, (WORD)((Black << 4) | LightGray));
 }
-void cout_cl(const char* out, int font = LightGray, int back = Black) {
+const char * cout_cl(const char* out, int font = LightGray, int back = Black) {
 	SetConsoleTextAttribute(hCon, (WORD)((back << 4) | font));
 	cout << out;
 	SetConsoleTextAttribute(hCon, (WORD)((Black << 4) | LightGray));
+	return "";
 }
-void coutNoAllcolor(int i,char * name, int kol, int width, int height, int buy_dollars, int buy_grn, int promiz_kol) {
+void coutNoAllcolor(int i,char * name, int kol, int width, int height, float buy, int promiz_kol) {
 	cout << setw(6) << i + 1;
 	cout_cl("|", promiz_kol);
 	cout << setw(24) << name;
@@ -519,9 +573,9 @@ void coutNoAllcolor(int i,char * name, int kol, int width, int height, int buy_d
 	cout_cl("|", promiz_kol);
 	cout << setw(6) << height;
 	cout_cl("|", promiz_kol);
-	cout << setw(6) << buy_dollars;
+	cout << setw(10) << buy;
 	cout_cl("|", promiz_kol);
-	cout << setw(6) << buy_grn;
+	cout << setw(10) << buy*usd_to_grn;
 	cout_cl("|", promiz_kol);
 	cout << endl;
 }
@@ -536,9 +590,9 @@ void punks(int colorr) {
 	cout_cl("|", colorr);
 	cout << setw(6) << "Height";
 	cout_cl("|", colorr);
-	cout << setw(6) << "USD";
+	cout << setw(10) << "USD";
 	cout_cl("|", colorr);
-	cout << setw(6) << "GRN";
+	cout << setw(10) << "GRN";
 	cout_cl("|", colorr);
 	cout << endl;
 }
@@ -551,25 +605,60 @@ void coutnoallone(base * bs, const int size, char in, const char *iin, const int
 	for (int i = 0; i < size; i++)
 	{
 		if (bs[i].type == in) {
-			coutNoAllcolor(i, bs[i].name, bs[i].kol, bs[i].width, bs[i].height, bs[i].buy_dollars, bs[i].buy_grn, color_row);
+			coutNoAllcolor(i, bs[i].name, bs[i].kol, bs[i].width, bs[i].height, bs[i].buy, color_row);
 			fullline('-', color_line);
 		}
 
 	}
 }
-void CoutNOAll(base * bs, const int size) {
+int kolbs(base * bs, const int size, char h) {
+	int kol = 0;
+	for (int i = 0; i < size; i++)
+	{
+		if (bs[i].type == h) {
+			kol++;
+		}
+	}
+	return kol;
+}
+void CoutNOAll(base * bs, const int size, int a = 0) {
 	const int color_items = 15, color_line = 4, color_row = 12;
-	coutnoallone(bs, size, 'p', "PRINTERS", color_items, color_line, color_row);
-	cout << endl;
-	coutnoallone(bs, size, 'c', "COMPUTER BLOCKS", color_items, color_line, color_row);
-	cout << endl;
-	coutnoallone(bs, size, 'm', "MONITORS", color_items, color_line, color_row);
-	cout << endl;
-	coutnoallone(bs, size, 'k', "KEYBOARDS", color_items, color_line, color_row);
-	cout << endl;
-	coutnoallone(bs, size, 'o', "MOUSES", color_items, color_line, color_row);
-	cout << endl;
-	coutnoallone(bs, size, 'a', "SCANERS", color_items, color_line, color_row);
+	if (a == 0 || a == 1) {
+		if (kolbs(bs, size, 'p') || a == 0) {
+			coutnoallone(bs, size, 'p', "PRINTERS", color_items, color_line, color_row);
+			cout << endl;
+		}
+		if (kolbs(bs, size, 'c') || a == 0) {
+			coutnoallone(bs, size, 'c', "COMPUTER BLOCKS", color_items, color_line, color_row);
+			cout << endl;
+		}
+		if (kolbs(bs, size, 'm') || a == 0) {
+			coutnoallone(bs, size, 'm', "MONITORS", color_items, color_line, color_row);
+			cout << endl;
+		}
+		if (kolbs(bs, size, 'k') || a == 0) {
+			coutnoallone(bs, size, 'k', "KEYBOARDS", color_items, color_line, color_row);
+			cout << endl;
+		}
+		if (kolbs(bs, size, 'o') || a == 0) {
+			coutnoallone(bs, size, 'o', "MOUSES", color_items, color_line, color_row);
+			cout << endl;
+		}
+		if (kolbs(bs, size, 'a') || a == 0) {
+			coutnoallone(bs, size, 'a', "SCANERS", color_items, color_line, color_row);
+		}
+	}
+	else if (a == 2) {
+		fullline('-', color_items);
+		cout << setiosflags(ios::left);
+		punks(color_items);
+		fullline('-', color_items);
+		for (int i = 0; i < size; i++)
+		{
+			coutNoAllcolor(i, bs[i].name, bs[i].kol, bs[i].width, bs[i].height, bs[i].buy, color_row);
+			fullline('-', color_line);
+		}
+	}
 }
 void coutall(base * bs, const int size, const int color_items, const int color_line, const int color_row,const int start, const int finish) {
 	if (start > -1 && finish <= size) {
@@ -587,7 +676,7 @@ void coutall(base * bs, const int size, const int color_items, const int color_l
 			cout << " ";
 			cout << setw(2);
 			cout << " ";
-			coutNoAllcolor(i, bs[i].name, bs[i].kol, bs[i].width, bs[i].height, bs[i].buy_dollars, bs[i].buy_grn, color_row);
+			coutNoAllcolor(i, bs[i].name, bs[i].kol, bs[i].width, bs[i].height, bs[i].buy, color_row);
 			fullline('-', color_line);
 		}
 	}
@@ -595,20 +684,36 @@ void coutall(base * bs, const int size, const int color_items, const int color_l
 	{
 		fullline('-', color_items);
 		cout << setiosflags(ios::left);
+		cout << setw(2);
+		cout << " ";
+		cout << setw(2);
+		cout << " ";
 		punks(color_items);
 		fullline('-', color_items);
 		for (int i = 0; i < size; i++)
 		{
-			coutNoAllcolor(i, bs[i].name, bs[i].kol, bs[i].width, bs[i].height, bs[i].buy_dollars, bs[i].buy_grn, color_row);
+			cout << setw(2);
+			cout << " ";
+			cout << setw(2);
+			cout << " ";
+			coutNoAllcolor(i, bs[i].name, bs[i].kol, bs[i].width, bs[i].height, bs[i].buy, color_row);
 			fullline('-', color_line);
 		}
 	}
 }
-
+void clear_line(int y) {
+	gotoxy(0, y);
+	int _chars = GetBufferChars();
+	for (int i = 0; i < _chars; i++)
+	{
+		cout << '\0';
+	}
+	gotoxy(0, y);
+}
 int SelectItems(base *bs, const int size, bool *masstoseind) {
-	char act, message[301] = { "" }, options[301] = { "BACK : B, OK : O" };
-	int ch = 0, start = 0, finish = 13, item = 0;
-	bool reload = true, exit = false, reload_back = false;
+	char act, message[301] = { "" }, options[301] = { "BACK : B, OK : O, Select all : S, Unselectall : U" };
+	int ch = 0, start = 0, conc = GetBufferCharsbot(),finish = (conc-4)/2, item = 0;
+	bool reload = true, exit = false, reload_back = false, new_options = true;
 	const int color_items = 15, color_line = 4, color_row = 12;
 	while (!exit)
 	{
@@ -621,55 +726,48 @@ int SelectItems(base *bs, const int size, bool *masstoseind) {
 			{
 				if (masstoseind[i] == true) {
 					gotoxy(2, 3 + ((i-start) * 2));
-					cout << "*";
+					cout << '*';
 				}
 			
 			}
-			gotoxy(0, 29);
-			cout << options << message;
-			message[0] = '\0';
 		}
 		if (strlen(message)) {
-			gotoxy(0, 29);
+			gotoxy(0, conc);
 			cout << options << message;
 			message[0] = '\0';
+			new_options = true;
 		}
-		else {
-			gotoxy(0, 29);
-			int _chars = GetBufferChars();
-			for (int i = 0; i < _chars; i++)
-			{
-				cout << ' ';
-			}
-			gotoxy(0, 29);
+		else if (new_options) {
+			clear_line(conc);
 			cout << options;
+			new_options = false;
 		}
 		if (item > 0 && item < finish - 1) {
 			gotoxy(0, 3 + ((item - 1 - start) * 2));
-			cout << " ";
+			cout << '\0';
 			gotoxy(0, 3 + ((item + 1 - start) * 2));
-			cout << " ";
+			cout << '\0';
 		}
 		else
 		if (item == 0) {
 			gotoxy(0, 3 + ((item + 1 - start) * 2));
-			cout << " ";
+			cout << '\0';
 		}
 		else
 		if (item == finish-1) {
 			gotoxy(0, 3 + ((item - 1 - start) * 2));
-			cout << " ";
+			cout << '\0';
 		}
 		
 		gotoxy(0, 3 + ((item - start) * 2));
-		cout << ">";
-		while (ch != 13 && ch != 80 && ch != 72 && ch != -87 && ch != -23)
+		cout << '>';
+		while (ch != 13 && ch != 80 && ch != 72 && ch != -88 && ch != -23 && ch != 111 && ch != 98 && ch != 63 && ch != 115 && ch != -93 && ch != 117)
 		{
 			act = _getch();
-			ch = static_cast<int>(act);//привожу к соответствующему коду
+			ch = static_cast<int>(act);
 			switch (ch)
 			{
-			case 80: // вниз
+			case 80:
 				if (item < size - 1) item++; 
 				else ch = 0;
 				if (item+1 > finish && finish < size && ch != 0) {
@@ -678,7 +776,7 @@ int SelectItems(base *bs, const int size, bool *masstoseind) {
 					reload = true;
 				}
 				break;
-			case 72: // вверх
+			case 72: 
 				if (item > 0) item--;
 				else ch = 0;
 				if (item < start && start > 0 && ch != 0) {
@@ -687,10 +785,17 @@ int SelectItems(base *bs, const int size, bool *masstoseind) {
 					reload = true;
 				}
 				break;
-			case -87:
-				exit = true;
+			case -88:
+			case 98:
+				clear_line(conc);
+				if (yesno("Back to menu (Yes or No): ")) exit = true;
+				else {
+					clear_line(conc);
+					cout << options;
+				}
 				break;
 			case -23:
+			case 111:
 				for (int i = 0; i < size; i++)
 				{
 					if (masstoseind[i]) return 1;
@@ -698,6 +803,7 @@ int SelectItems(base *bs, const int size, bool *masstoseind) {
 				strcpy_s(message, 300, " | None Selected |");
 				break;
 			case 13:
+
 				if (!masstoseind[item]) {
 					masstoseind[item] = true;
 					cout << " *";
@@ -707,23 +813,136 @@ int SelectItems(base *bs, const int size, bool *masstoseind) {
 					cout << "  ";
 				}
 				break;
+			case 63:
+			case 115:
+				for (int i = 0; i < size; i++)
+				{
+					if (!masstoseind[i]) masstoseind[i] = 1;
+				}
+				reload = true;
+				strcpy_s(message, 300, " | All selected! |");
+				break;
+			case -93:
+			case 117:
+				for (int i = 0; i < size; i++)
+				{
+					if (masstoseind[i]) masstoseind[i] = 0;
+				}
+				reload = true;
+				strcpy_s(message, 300, " | All deselected! |");
+				break;
 			}
 		}
 	}
 	return 0;
 }
+
+base* copytos(base *bs, const int size, base * to, int &ssize, char is) {
+	ssize = 0;
+	to = nullptr;
+	for (int i = 0; i < size; i++) {
+		if (is == bs[i].type || is == 'e') {
+			to = AddOneToMass(to, ssize, bs[i]);
+		}
+	}
+	return to;
+}
+
+void showpodrobno(base *bs, int i) {
+	fullline('-', LightRed);
+	cout << cout_cl("Index\t: ", White) << i + 1 << endl;
+	cout << cout_cl("\tType: ", 14);
+	switch (bs[i].type)
+	{
+
+	case 'p':
+		cout << "Printers";
+		break;
+	case 'c':
+		cout << "Computer block";
+		break;
+	case 'm':
+		cout << "Monitor";
+		break;
+	case 'k':
+		cout << "Keyboard";
+		break;
+	case 'o':
+		cout << "Mouse";
+		break;
+	case 'a':
+		cout << "Scaner";
+		break;
+	}
+	cout << endl;
+	cout << cout_cl("\tName\t\t: ", 14) << bs[i].name << endl;
+	cout << cout_cl("\tHow many\t: ", 14) << bs[i].kol << endl;
+	cout << cout_cl("\tWidth\t\t: ", 14) << bs[i].width << endl;
+	cout << cout_cl("\tHeigth\t\t: ", 14) << bs[i].height << endl;
+	cout << cout_cl("\tBuy in GRN\t: ", 14) << bs[i].buy*usd_to_grn << endl;
+	cout << cout_cl("\tBuy in USD\t: ", 14) << bs[i].buy << endl;
+
+	switch (bs[i].type)
+	{
+
+	case 'p':
+		cout << cout_cl("\t\tType\t\t: ", 13) << bs[i].u.pr.type << endl;
+		cout << cout_cl("\t\tMulticolor\t: ", 13) << ysno(bs[i].u.pr.Multi_color_cartridge) << endl;
+		cout << cout_cl("\t\tScaner\t\t: ", 13) << ysno(bs[i].u.pr.with_scaner) << endl;
+		break;
+	case 'c':
+		cout << cout_cl("\t\tMat Plat\t: ", 13) << bs[i].u.cbl.name_mat_plat << endl;
+		cout << cout_cl("\t\tPower bl\t: ", 13) << bs[i].u.cbl.name_power_block << endl;
+		cout << cout_cl("\t\tProcessor\t: ", 13) << bs[i].u.cbl.name_processor << endl;
+		cout << cout_cl("\t\tVideo Card\t: ", 13) << bs[i].u.cbl.name_vid_card << endl;
+		cout << cout_cl("\t\tWindows\t\t: ", 13) << ysno(bs[i].u.cbl.windows_in) << endl;
+		break;
+	case 'm':
+		cout << cout_cl("\t\tMatric type\t: ", 13) << bs[i].u.mn.matric_type << endl;
+		cout << cout_cl("\t\tScreen width\t: ", 13) << bs[i].u.mn.screen_width << endl;
+		cout << cout_cl("\t\tScreen height\t: ", 13) << bs[i].u.mn.screen_height << endl;
+		break;
+	case 'k':
+		cout << cout_cl("\t\tType\t\t: ", 13) << bs[i].u.kbrd.type_keyb << endl;
+		cout << cout_cl("\t\tWith ua\t\t: ", 13) << ysno(bs[i].u.kbrd.with_ua) << endl;
+		break;
+	case 'o':
+		cout << cout_cl("\t\tType sensor\t: ", 13) << bs[i].u.mous.type_sensor << endl;
+		cout << cout_cl("\t\tWith shnur\t: ", 13) << ysno(bs[i].u.mous.with_shnur) << endl;
+		break;
+	case 'a':
+		cout << cout_cl("\t\tScan width\t: ", 13) << bs[i].u.scn.scan_width << endl;
+		cout << cout_cl("\t\tScan height\t: ", 13) << bs[i].u.scn.scan_height << endl;
+		break;
+	}
+	fullline('-', LightRed);
+}
+
 void main() {
-	
-	int size = 0, menu = 1;
-	bool exit = false, *mass = new bool[size];
-	char message[301] = { "Hello in main base!" }, filename[20] = { "my.txt" };
-	base *bs = nullptr;
+	cout << fixed;
+	cout.precision(1);
+	int size = 0, menu = 1, size_tm = 0, type = 1;
+	POINT tmtm;
+	bool exit = false;
+	char message[301] = { "Hello in main base!" }, filename[20] = { "my.txt" }, ttm[30];
+	base *bs = nullptr, *tempp = nullptr;
 	bs = synhronize(filename, bs, size);
 	while (!exit) {
 		cl();
-		CoutNOAll(bs, size);
+		SetConsoleTextAttribute(hCon, (WORD)((15 << 4) | 0));
+		cout << "Kurs: " << usd_to_grn << endl;
+		SetConsoleTextAttribute(hCon, (WORD)((Black << 4) | LightGray));
+		
+		bool *mass = new bool[size];
+		if (tempp != nullptr) {
+			CoutNOAll(tempp, size_tm, type);
+			tempp = nullptr;
+			size_tm = 0;
+			type = 1;
+		}
+		else CoutNOAll(bs, size, type);
 		message_send(message);
-		menus("Exit|Cout all of index|Add New Vehicle", menu);
+		menus("Exit|Cout all of index|Add New Vehicle|Delete Items|Vybirka tovars|Set new curs|Sort", menu);
 		switch (menu)
 		{
 			case 0:
@@ -739,43 +958,11 @@ void main() {
 					for (int i = 0; i < size; i++)
 					{
 						if (mass[i]) {
-							fullline('-', LightRed);
-							cout << "Index\t: " << i + 1 << endl;
-							cout << "\tType: ";
-							switch (bs[i].type)
-							{
-
-							case 'p':
-								cout << "Printers";
-								break;
-							case 'c':
-								cout << "Computer block";
-								break;
-							case 'm':
-								cout << "Monitor";
-								break;
-							case 'k':
-								cout << "Keyboard";
-								break;
-							case 'o':
-								cout << "Mouse";
-								break;
-							case 'a':
-								cout << "Scaner";
-								break;
-							}
-							cout << endl;
-							cout << "\tName\t: " << bs[i].name << endl;
-							cout << "\tHow many\t: " << bs[i].kol << endl;
-							cout << "\tWidth\t: " << bs[i].width << endl;
-							cout << "\tHeigth\t: " << bs[i].height << endl;
-							cout << "\tBut in GRN\t: " << bs[i].buy_dollars << endl;
-							cout << "\tBut in USD\t: " << bs[i].buy_grn << endl;
-							
+							showpodrobno(bs, i);
 						}
 					}
 				while (!yesno("<< Back (Yes or No): "));
-				}else strcpy_s(message, 300, " | You in main menu |");
+				}else strcpy_s(message, 300, "| You in main menu |");
 				break;
 			case 2:
 				while (true)
@@ -785,6 +972,356 @@ void main() {
 					cl();
 					if (!yesno("Continue inputing (Yes or No): ")) break;
 				}
+				break;
+			case 3:
+				for (int i = 0; i < size; i++)
+				{
+					mass[i] = false;
+				}
+				if (SelectItems(bs, size, mass)) {
+					int i = 0;
+					while (i < size)
+					{
+						if (mass[i]) {
+							bs = DeleteOneToMass(bs, size, i);
+							size++;
+							mass = DeleteOneToMassI(mass, size, i);
+						}
+						else i++;
+					}
+					strcpy_s(message, 300, "| Deleting is ok |");
+				}else strcpy_s(message, 300, "| You in main menu |");
+				break;
+			case 4:
+				strcpy_s(message, 300, "| You in vybika menu |");
+				menu = 1;
+				while (!exit) {
+					char smt = 0;
+					cl();
+					SetConsoleTextAttribute(hCon, (WORD)((15 << 4) | 0));
+					cout << "Kurs: " << usd_to_grn << endl;
+					SetConsoleTextAttribute(hCon, (WORD)((Black << 4) | LightGray));
+					if (tempp != nullptr) {
+						tmtm = pos_cur();
+						if (yesno("Show podrobno of tovars (Yes or No):")) {
+							clearToPos(tmtm);
+							for (int i = 0; i < size_tm; i++)
+							{
+									showpodrobno(tempp, i);
+							}
+							while (!yesno("<< Back (Yes or No): "));
+						}
+						clearToPos(tmtm);
+						CoutNOAll(tempp, size_tm, type);
+						delete[] tempp;
+						tempp = nullptr;
+						size_tm = 0;
+						type = 1;
+					}
+					else CoutNOAll(bs, size, type);
+					message_send(message);
+					cout << "Vybirka 1: " << endl;
+					menus(" << Back|All|Printers|Computer blocks|Mouses|Keyboars|Monitors|Scaners", menu);
+					switch (menu)
+					{
+					case 1:smt = 'e'; break;
+					case 2:smt = 'p'; break;
+					case 3:smt = 'c'; break;
+					case 4:smt = 'o'; break;
+					case 5:smt = 'k'; break;
+					case 6:smt = 'm'; break;
+					case 7:smt = 'a'; break;
+					}
+					switch (menu)
+					{
+					case 0:
+						exit = true;
+						strcpy_s(message, 300, "| You in main menu |");
+						break;
+					case 1:
+					case 2:
+					case 3:
+					case 4:
+					case 5:
+					case 6:
+					case 7:
+						strcpy_s(message, 300, "| You in vybika menu 2 |");
+						menu = 1;
+						while (!exit)
+						{
+							char gpd = 0, name[30];
+							float zminna;
+							cl();
+							SetConsoleTextAttribute(hCon, (WORD)((15 << 4) | 0));
+							cout << "Kurs: " << usd_to_grn << endl;
+							SetConsoleTextAttribute(hCon, (WORD)((Black << 4) | LightGray));
+							CoutNOAll(bs, size, type);
+							message_send(message);
+							cout << "Vybirka 2: " << endl;
+							menus(" << Back|Of width|Of height|Of kol in sclad|Of price USD", menu);
+							switch (menu)
+							{
+							case 1:gpd = 'w'; strcpy_s(name, 29, "width"); break;
+							case 2:gpd = 'h'; strcpy_s(name, 29, "height"); break;
+							case 3:gpd = 'k'; strcpy_s(name, 29, "kol in base"); break;
+							case 4:gpd = 'p'; strcpy_s(name, 29, "price"); break;
+							}
+							switch (menu)
+							{
+							case 0:
+								exit = true;
+								strcpy_s(message, 300, "| You in vybika menu |");
+								break;
+							case 1:
+							case 2:
+							case 3:
+							case 4:
+								cl();
+								cout << "Input " << name << ": ";
+								tmtm = pos_cur();
+								do
+								{
+									clearToPos(tmtm);
+									cin.getline(ttm, 29);
+									zminna = onlynums(ttm);
+								} while (zminna <= 0);
+								strcpy_s(message, 300, "| You in vybika menu 3 |");
+								menu = 1;
+								while (!exit)
+								{
+									char punktss[100] = { " << Back|" };
+									float main_zm;
+									
+									strcat_s(punktss, 99, ftoa(zminna));
+									strcat_s(punktss, 99, " > ");
+									strcat_s(punktss, 99, name);
+									strcat_s(punktss, 99, "|");
+									strcat_s(punktss, 99, ftoa(zminna));
+									strcat_s(punktss, 99, " < ");
+									strcat_s(punktss, 99, name);
+									strcat_s(punktss, 99, "|");
+									strcat_s(punktss, 99, ftoa(zminna));
+									strcat_s(punktss, 99, " => ");
+									strcat_s(punktss, 99, name);
+									strcat_s(punktss, 99, "|");
+									strcat_s(punktss, 99, ftoa(zminna));
+									strcat_s(punktss, 99, " =< ");
+									strcat_s(punktss, 99, name);
+									strcat_s(punktss, 99, "|");
+									strcat_s(punktss, 99, ftoa(zminna));
+									strcat_s(punktss, 99, " = ");
+									strcat_s(punktss, 99, name);
+									cl();
+									SetConsoleTextAttribute(hCon, (WORD)((15 << 4) | 0));
+									cout << "Kurs: " << usd_to_grn << endl;
+									SetConsoleTextAttribute(hCon, (WORD)((Black << 4) | LightGray));
+									CoutNOAll(bs, size, type);
+									message_send(message);
+									cout << "Vybirka 3: " << endl;
+									menus(punktss, menu);
+									switch (menu)
+									{
+									case 0:
+										exit = true;
+										strcpy_s(message, 300, "| You in vybika menu 2 |");
+										break;
+									case 1:
+									case 2:
+									case 3:
+									case 4:
+									case 5:
+										for (int i = 0; i < size; i++)
+										{
+											if ((bs[i].type == smt || smt == 'e')) {
+												switch (gpd)
+												{
+												case 'w':
+													main_zm = bs[i].width;
+													break;
+												case 'h':
+													main_zm = bs[i].height;
+													break;
+												case 'p':
+													main_zm = bs[i].buy;
+													break;
+												case 'k':
+													main_zm = bs[i].kol;
+													break;
+												}
+												switch (menu)
+												{
+												case 1:
+													if (zminna > main_zm) {
+														tempp = AddOneToMass(tempp, size_tm, bs[i]);
+													}
+													break;
+												case 2:
+													if (zminna < main_zm) {
+														tempp = AddOneToMass(tempp, size_tm, bs[i]);
+													}
+													break;
+												case 3:
+													if (zminna >= main_zm) {
+														tempp = AddOneToMass(tempp, size_tm, bs[i]);
+													}
+													break;
+												case 4:
+													if (zminna <= main_zm) {
+														tempp = AddOneToMass(tempp, size_tm, bs[i]);
+													}
+													break;
+												case 5:
+													if (zminna == main_zm) {
+														tempp = AddOneToMass(tempp, size_tm, bs[i]);
+													}
+													break;
+												}
+											}
+										}
+									if (tempp != nullptr) exit = true;
+										break;
+									}
+								}
+								if (tempp == nullptr) exit = false;
+								menu = 1;
+								break;
+
+							}
+						}
+						exit = false;
+						menu = 1;
+						break;
+					}
+				}
+				exit = false;
+				menu = 1;
+
+				break;
+			case 5:
+				cl();
+				cout << "Input Kurs 1 USD to GRN: ";
+				tmtm = pos_cur();
+				do
+				{
+					clearToPos(tmtm);
+					cin.getline(ttm, 29);
+					usd_to_grn = onlynums(ttm);
+				} while (usd_to_grn <= 0);
+				strcpy_s(message, 300, "| Inputed new curs |");
+				break;
+			case 6:
+				strcpy_s(message, 300, "| You in sort menu |");
+				menu = 1;
+				while (!exit)
+				{
+					char smt = 0;
+					cl();
+					SetConsoleTextAttribute(hCon, (WORD)((15 << 4) | 0));
+					cout << "Kurs: " << usd_to_grn << endl;
+					SetConsoleTextAttribute(hCon, (WORD)((Black << 4) | LightGray));
+					if (tempp != nullptr) {
+						tmtm = pos_cur();
+						if (yesno("Show podrobno of tovars (Yes or No):")) {
+							clearToPos(tmtm);
+							for (int i = 0; i < size_tm; i++)
+							{
+								showpodrobno(tempp, i);
+							}
+							while (!yesno("<< Back (Yes or No): "));
+						}
+						clearToPos(tmtm);
+						CoutNOAll(tempp, size_tm, type);
+						delete[] tempp;
+						tempp = nullptr;
+						size_tm = 0;
+						type = 1;
+					}
+					else CoutNOAll(bs, size, type);
+					message_send(message);
+					cout << "Sort: " << endl;
+					menus(" << Back|All|Printers|Computer blocks|Mouses|Keyboars|Monitors|Scaners", menu);
+					switch (menu)
+					{
+					case 1:smt = 'e'; break;
+					case 2:smt = 'p'; break;
+					case 3:smt = 'c'; break;
+					case 4:smt = 'o'; break;
+					case 5:smt = 'k'; break;
+					case 6:smt = 'm'; break;
+					case 7:smt = 'a'; break;
+					}
+					switch (menu)
+					{
+					case 0:
+						strcpy_s(message, 300, "| You in main menu |");
+						exit = true;
+						break;
+					case 1:
+					case 2:
+					case 3:
+					case 4:
+					case 5:
+					case 6:
+					case 7:
+						tempp = copytos(bs, size, tempp, size_tm, smt);
+						strcpy_s(message, 300, "| You in sort menu 2 |");
+						menu = 1;
+						while (!exit) {
+							SetConsoleTextAttribute(hCon, (WORD)((15 << 4) | 0));
+							cout << "Kurs: " << usd_to_grn << endl;
+							SetConsoleTextAttribute(hCon, (WORD)((Black << 4) | LightGray));
+							cl();
+							CoutNOAll(tempp, size_tm, type);
+							message_send(message);
+							cout << "Sort: " << endl;
+							menus(" << Back|To width|To height|To kol in sclad|To price USD", menu);
+
+							switch (menu) {
+							case 0:
+								delete[] tempp;
+								tempp = nullptr;
+								size_tm = 0;
+								type = 1;
+							case 1:
+								type = 2;
+								for (int i = 0; i < size_tm - 1; i++)
+									for (int j = size_tm - 1; j > i; j--)
+										if (tempp[j].width < bs[j-1].width) swap(tempp[j], tempp[j - 1]);
+								strcpy_s(message, 300, "| Sorted of width |");
+							break;
+							case 2:
+								type = 2;
+								for (int i = 0; i < size_tm - 1; i++)
+									for (int j = size_tm - 1; j > i; j--)
+										if (tempp[j].height < tempp[j - 1].height) swap(tempp[j], tempp[j - 1]);
+								strcpy_s(message, 300, "| Sorted of Height |");
+								break;
+							case 3:
+								type = 2;
+								for (int i = 0; i < size_tm - 1; i++)
+									for (int j = size_tm - 1; j > i; j--)
+										if (tempp[j].kol < tempp[j - 1].kol) swap(tempp[j], tempp[j - 1]);
+								strcpy_s(message, 300, "| Sorted of kol |");
+								break;
+							case 4:
+								type = 2;
+								for (int i = 0; i < size_tm - 1; i++)
+									for (int j = size_tm - 1; j > i; j--)
+										if (tempp[j].buy < tempp[j - 1].buy) swap(tempp[j], tempp[j - 1]);
+								strcpy_s(message, 300, "| Sorted of price in USD |");
+								break;
+							}
+							exit = true;
+						}
+						menu = 1;
+						exit = false;
+						break;
+
+					}
+					
+				}
+				exit = false;
+				menu = 1;
 				break;
 		}
 	}
