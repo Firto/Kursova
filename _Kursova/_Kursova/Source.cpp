@@ -235,7 +235,7 @@ float onlynums(char *text) {
 	int h = 0, m = 0;
 	while (text[m] != '\0')
 	{
-		if (text[m] >= '0' && text[m] <= '9' || (text[m] == '.' && h>0 && text[m-1] >= '0' && text[m-1] <= '9')) {
+		if ((text[m] >= '0' && text[m] <= '9') || (text[m] == '.' && h>0 && text[m-1] >= '0' && text[m-1] <= '9') || (m == 0 && text[m] == '-')) {
 			temp[h] = text[m];
 			h++;
 		}
@@ -662,14 +662,6 @@ void CoutNOAll(base * bs, const int size, int a = 0) {
 }
 void coutall(base * bs, const int size, const int color_items, const int color_line, const int color_row,const int start, const int finish) {
 	if (start > -1 && finish <= size) {
-		fullline('-', color_items);
-		cout << setiosflags(ios::left);
-		cout << setw(2);
-		cout << " ";
-		cout << setw(2);
-		cout << " ";
-		punks(color_items);
-		fullline('-', color_items);
 		for (int i = start; i < finish; i++)
 		{
 			cout << setw(2);
@@ -682,14 +674,6 @@ void coutall(base * bs, const int size, const int color_items, const int color_l
 	}
 	else
 	{
-		fullline('-', color_items);
-		cout << setiosflags(ios::left);
-		cout << setw(2);
-		cout << " ";
-		cout << setw(2);
-		cout << " ";
-		punks(color_items);
-		fullline('-', color_items);
 		for (int i = 0; i < size; i++)
 		{
 			cout << setw(2);
@@ -711,15 +695,24 @@ void clear_line(int y) {
 	gotoxy(0, y);
 }
 int SelectItems(base *bs, const int size, bool *masstoseind) {
+	cl();
 	char act, message[301] = { "" }, options[301] = { "BACK : B, OK : O, Select all : S, Unselectall : U" };
 	int ch = 0, start = 0, conc = GetBufferCharsbot(),finish = (conc-4)/2, item = 0;
 	bool reload = true, exit = false, reload_back = false, new_options = true;
 	const int color_items = 15, color_line = 4, color_row = 12;
+	fullline('-', color_items);
+	cout << setiosflags(ios::left);
+	cout << setw(2);
+	cout << " ";
+	cout << setw(2);
+	cout << " ";
+	punks(color_items);
+	fullline('-', color_items);
 	while (!exit)
 	{
 		ch = 0;
 		if (reload) {
-			cl();
+			gotoxy(0, 3);
 			coutall(bs, size, color_items, color_line, color_row, start, finish);
 			reload = false;
 			for (int i = start; i < finish; i++)
@@ -915,7 +908,6 @@ void showpodrobno(base *bs, int i) {
 		cout << cout_cl("\t\tScan height\t: ", 13) << bs[i].u.scn.scan_height << endl;
 		break;
 	}
-	fullline('-', LightRed);
 }
 
 void main() {
@@ -972,6 +964,7 @@ void main() {
 					cl();
 					if (!yesno("Continue inputing (Yes or No): ")) break;
 				}
+				InputBToFile(filename, bs, size);
 				break;
 			case 3:
 				for (int i = 0; i < size; i++)
@@ -1009,6 +1002,7 @@ void main() {
 							{
 									showpodrobno(tempp, i);
 							}
+							fullline('-', LightRed);
 							while (!yesno("<< Back (Yes or No): "));
 						}
 						clearToPos(tmtm);
@@ -1227,6 +1221,7 @@ void main() {
 							{
 								showpodrobno(tempp, i);
 							}
+							fullline('-', LightRed);
 							while (!yesno("<< Back (Yes or No): "));
 						}
 						clearToPos(tmtm);
